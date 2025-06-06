@@ -1,0 +1,745 @@
+======================================================================
+                     ROGUELIKE 星际射击游戏 - API 文档
+======================================================================
+
+项目名称: Puppy HWK And His Four Dom Masters - 星际射击
+版本: 2.0
+开发语言: Rust
+图形库: macroquad
+文档类型: API 接口文档
+
+======================================================================
+1. 核心数据结构 API
+======================================================================
+
+1.1 Vec2 结构体
+描述: 2D向量结构，用于表示位置、速度、方向等
+
+```rust
+pub struct Vec2 {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Vec2 {
+    /// 创建新的Vec2向量
+    /// 参数: x, y - 坐标值
+    /// 返回: Vec2实例
+    pub fn new(x: f32, y: f32) -> Self
+
+    /// 计算两点间距离
+    /// 参数: other - 另一个Vec2点
+    /// 返回: f32距离值
+    pub fn distance(&self, other: &Vec2) -> f32
+
+    /// 向量归一化
+    /// 返回: 单位向量Vec2
+    pub fn normalize(&self) -> Vec2
+}
+```
+
+1.2 GameState 枚举
+描述: 游戏状态枚举，控制游戏流程
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum GameState {
+    MainMenu,        // 主菜单
+    WeaponSelect,    // 武器选择
+    Login,          // 登录界面
+    Battle,         // 战斗状态
+    RogueSelection, // 肉鸽升级选择
+    GameOver,       // 游戏结束
+}
+```
+
+1.3 InputMode 枚举
+描述: 输入模式枚举，用于登录系统
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum InputMode {
+    None,      // 无输入模式
+    Username,  // 用户名输入
+    Password,  // 密码输入
+}
+```
+
+======================================================================
+2. 武器系统 API
+======================================================================
+
+2.1 WeaponType 枚举
+描述: 武器类型枚举
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum WeaponType {
+    MachineGun,  // 机枪：高射速，多发子弹
+    Laser,       // 激光：中射速，穿透能力
+    Shotgun,     // 霰弹枪：中射速，散射子弹
+}
+```
+
+2.2 Weapon 结构体
+描述: 武器数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Weapon {
+    pub weapon_type: WeaponType,     // 武器类型
+    pub attack_power: i32,           // 基础攻击力
+    pub attack_speed: f32,           // 攻击速度(每秒)
+    pub bullet_speed: f32,           // 子弹速度
+    pub bullet_count: i32,           // 子弹数量
+    pub enhancement_level: i32,      // 强化等级
+}
+
+impl Weapon {
+    /// 创建新武器
+    /// 参数: weapon_type - 武器类型
+    /// 返回: Weapon实例
+    pub fn new(weapon_type: WeaponType) -> Self
+
+    /// 获取总攻击力（基础+强化）
+    /// 返回: i32总攻击力
+    pub fn get_total_attack_power(&self) -> i32
+}
+```
+
+武器参数表:
+```
+类型        | 攻击力 | 攻击速度 | 子弹速度 | 子弹数量
+MachineGun |   2   |   1.2   |   2.0   |    2
+Laser      |   4   |   1.25  |   0.0   |    1
+Shotgun    |   4   |   1.0   |   3.0   |    3
+```
+
+======================================================================
+3. 敌人系统 API
+======================================================================
+
+3.1 EnemyType 枚举
+描述: 敌人类型枚举
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnemyType {
+    Scout,   // 侦察机：快速移动，低血量
+    Heavy,   // 重甲舰：多攻击模式，中血量
+    Carrier, // 航母：生成敌人，高血量
+    Boss,    // Boss：复杂攻击，超高血量
+}
+```
+
+3.2 Enemy 结构体
+描述: 敌人数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Enemy {
+    pub enemy_type: EnemyType,          // 敌人类型
+    pub position: Vec2,                 // 当前位置
+    pub velocity: Vec2,                 // 移动速度
+    pub health: i32,                    // 当前血量
+    pub max_health: i32,                // 最大血量
+    pub bullet_damage: i32,             // 子弹伤害
+    pub collision_damage: i32,          // 碰撞伤害
+    pub last_shot_time: Instant,        // 上次射击时间
+    pub spawn_time: Instant,            // 生成时间
+    pub special_state: i32,             // 特殊状态
+    pub is_invincible: bool,            // 无敌状态
+    pub shield_health: i32,             // 护盾血量
+    pub movement_pattern: i32,          // 移动模式
+    pub movement_timer: f32,            // 移动计时器
+    pub target_position: Vec2,          // 目标位置
+    pub has_reached_zone: bool,         // 是否到达战斗区域
+}
+
+impl Enemy {
+    /// 创建新敌人
+    /// 参数: enemy_type - 敌人类型, position - 生成位置
+    /// 返回: Enemy实例
+    pub fn new(enemy_type: EnemyType, position: Vec2) -> Self
+
+    /// 获取击败奖励金币
+    /// 返回: i32金币数量
+    pub fn get_drop_gold(&self) -> i32
+
+    /// 获取击败奖励经验
+    /// 返回: i32经验值
+    pub fn get_drop_exp(&self) -> i32
+
+    /// 承受伤害
+    /// 参数: damage - 伤害值
+    pub fn take_damage(&mut self, damage: i32)
+}
+```
+
+敌人参数表:
+```
+类型    | 血量 | 速度 | 子弹伤害 | 碰撞伤害 | 金币 | 经验
+Scout   |  20  | 0.5  |    0    |    5    |  10  |  20
+Heavy   |  30  | 0.8  |    2    |    5    |  20  |  30
+Carrier | 100  | 0.3  |    0    |   10    |  50  |  50
+Boss    | 150  | 0.5  |   10    |   20    | 100  |   0
+```
+
+======================================================================
+4. 子弹系统 API
+======================================================================
+
+4.1 BulletType 枚举
+描述: 子弹类型枚举
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum BulletType {
+    PlayerMachineGun,  // 玩家机枪子弹
+    PlayerLaser,       // 玩家激光
+    PlayerShotgun,     // 玩家霰弹枪子弹
+    EnemyHeavy,        // 重甲舰子弹
+    EnemyBoss,         // Boss子弹
+    EnemyGeneric,      // 普通敌人子弹
+}
+```
+
+4.2 Bullet 结构体
+描述: 子弹数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Bullet {
+    pub position: Vec2,              // 当前位置
+    pub velocity: Vec2,              // 移动速度
+    pub damage: i32,                 // 伤害值
+    pub is_player_bullet: bool,      // 是否为玩家子弹
+    pub piercing_count: i32,         // 穿透次数
+    pub ricochet_count: i32,         // 反弹次数
+    pub burning_damage: i32,         // 燃烧伤害
+    pub explosion_damage: f32,       // 爆炸伤害比例
+    pub is_crit: bool,              // 是否暴击
+    pub hit_enemies: Vec<usize>,     // 已击中敌人索引
+    pub bullet_type: BulletType,     // 子弹类型
+}
+
+impl Bullet {
+    /// 创建新子弹
+    /// 参数: position - 初始位置, velocity - 速度向量
+    ///      damage - 伤害值, is_player_bullet - 归属
+    ///      bullet_type - 子弹类型
+    /// 返回: Bullet实例
+    pub fn new(
+        position: Vec2, 
+        velocity: Vec2, 
+        damage: i32, 
+        is_player_bullet: bool, 
+        bullet_type: BulletType
+    ) -> Self
+}
+```
+
+======================================================================
+5. 道具系统 API
+======================================================================
+
+5.1 ItemType 枚举
+描述: 道具类型枚举
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum ItemType {
+    HealthPack,  // 回血道具
+}
+```
+
+5.2 Item 结构体
+描述: 道具数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Item {
+    pub item_type: ItemType,     // 道具类型
+    pub position: Vec2,          // 当前位置
+    pub velocity: Vec2,          // 移动速度
+    pub value: i32,             // 道具数值（回血量等）
+    pub spawn_time: Instant,     // 生成时间
+}
+
+impl Item {
+    /// 创建新道具
+    /// 参数: item_type - 道具类型, position - 位置, value - 数值
+    /// 返回: Item实例
+    pub fn new(item_type: ItemType, position: Vec2, value: i32) -> Self
+}
+```
+
+======================================================================
+6. 肉鸽升级系统 API
+======================================================================
+
+6.1 UpgradeRarity 枚举
+描述: 升级稀有度枚举
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpgradeRarity {
+    Common,    // 普通（白色）
+    Rare,      // 稀有（蓝色）
+    Epic,      // 史诗（紫色）
+    Legendary, // 传说（金色）
+}
+```
+
+6.2 RogueUpgrade 结构体
+描述: 肉鸽升级数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct RogueUpgrade {
+    pub id: u32,                      // 升级唯一ID
+    pub name: String,                 // 升级名称
+    pub short_desc: String,           // 简短描述
+    pub detailed_desc: String,        // 详细描述
+    pub icon: String,                 // 图标字符
+    pub max_selections: Option<u32>,  // 最大选择次数
+    pub current_selections: u32,      // 当前选择次数
+    pub rarity: UpgradeRarity,       // 稀有度
+}
+
+impl RogueUpgrade {
+    /// 创建新升级
+    /// 参数: id - 唯一标识, name - 名称, short_desc - 简短描述
+    ///      detailed_desc - 详细描述, icon - 图标
+    ///      rarity - 稀有度, max_selections - 最大选择次数
+    /// 返回: RogueUpgrade实例
+    pub fn new(
+        id: u32, 
+        name: &str, 
+        short_desc: &str, 
+        detailed_desc: &str, 
+        icon: &str, 
+        rarity: UpgradeRarity, 
+        max_selections: Option<u32>
+    ) -> Self
+
+    /// 获取稀有度颜色
+    /// 返回: Color颜色值
+    pub fn get_rarity_color(&self) -> Color
+}
+```
+
+升级列表:
+```
+ID | 名称         | 简述      | 稀有度    | 效果
+0  | Life-Enhancing | HP+3    | Common   | +3最大血量
+1  | Firepower Increase | ATK+2 | Common | +2攻击力
+2  | Precision Shooting | CRIT+10% | Rare | +10%暴击率
+3  | Mortal Blow     | CRITDMG+20% | Epic | +20%暴击伤害
+4  | Multi-shot      | BULLET+1 | Common | +1子弹数(最多5次)
+5  | Exploding Warhead | EXPLOSION+30% | Rare | +30%爆炸伤害
+6  | Incendiary Ammunition | BURNING+2 | Common | +2燃烧伤害
+7  | Overclocking Engine | SPEED+30% | Rare | +30%攻击移动速度
+8  | Vibranium Armor | DEF+3 | Epic | +3伤害减免
+9  | Armor Piercing Shell | PIERCE+1 | Rare | +1穿透
+10 | Bouncing Technology | BOUNCE+1 | Epic | +1反弹
+```
+
+======================================================================
+7. 玩家系统 API
+======================================================================
+
+7.1 Player 结构体
+描述: 玩家数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Player {
+    // 基础属性
+    pub position: Vec2,              // 当前位置
+    pub health: i32,                 // 当前血量
+    pub max_health: i32,             // 最大血量
+    pub level: i32,                  // 等级
+    pub experience: i32,             // 当前经验
+    pub experience_needed: i32,      // 升级所需经验
+    
+    // 武器相关
+    pub weapon: Weapon,              // 当前武器
+    pub last_shot_time: Instant,     // 上次射击时间
+    
+    // 升级属性
+    pub attack_power_bonus: i32,     // 攻击力加成
+    pub crit_rate: f32,              // 暴击率
+    pub crit_damage: f32,            // 暴击伤害倍数
+    pub bullet_count_bonus: i32,     // 子弹数量加成
+    pub piercing: i32,               // 穿透次数
+    pub ricochet: i32,               // 反弹次数
+    pub burning_damage: i32,         // 燃烧伤害
+    pub explosion_damage: f32,       // 爆炸伤害比例
+    pub damage_reduction: i32,       // 伤害减免
+    pub bullet_speed_bonus: f32,     // 子弹速度加成
+    
+    // 其他属性
+    pub rogue_upgrades: Vec<RogueUpgrade>, // 已选择的升级
+    pub last_damage_time: Instant,         // 上次受伤时间
+    pub invincibility_duration: f32,       // 无敌持续时间
+}
+
+impl Player {
+    /// 创建新玩家
+    /// 返回: Player实例
+    pub fn new() -> Self
+
+    /// 增加经验值
+    /// 参数: exp - 经验值
+    pub fn add_experience(&mut self, exp: i32)
+
+    /// 等级提升
+    pub fn level_up(&mut self)
+
+    /// 检查是否可以射击
+    /// 返回: bool是否可以射击
+    pub fn can_shoot(&self) -> bool
+
+    /// 获取总攻击力
+    /// 返回: i32总攻击力
+    pub fn get_total_attack_power(&self) -> i32
+
+    /// 获取总子弹数量
+    /// 返回: i32子弹数量
+    pub fn get_total_bullet_count(&self) -> i32
+
+    /// 承受伤害
+    /// 参数: damage - 伤害值
+    pub fn take_damage(&mut self, damage: i32)
+}
+```
+
+======================================================================
+8. 游戏结算系统 API
+======================================================================
+
+8.1 GameResult 结构体
+描述: 游戏结算数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct GameResult {
+    pub victory: bool,              // 是否胜利
+    pub final_level: i32,           // 最终等级
+    pub coins_earned: i32,          // 获得金币
+    pub experience_gained: i32,     // 获得经验
+    pub survival_time: f32,         // 生存时间(秒)
+    pub enemies_defeated: i32,      // 击败敌人数
+    pub total_damage_dealt: i32,    // 总伤害输出
+    pub weapon_used: WeaponType,    // 使用的武器
+}
+
+impl GameResult {
+    /// 创建游戏结算
+    /// 参数: player - 玩家实例, victory - 是否胜利
+    ///      time - 游戏时间, enemies_defeated - 击败敌人数
+    ///      total_damage - 总伤害
+    /// 返回: GameResult实例
+    pub fn new(
+        player: &Player, 
+        victory: bool, 
+        time: f32, 
+        enemies_defeated: i32, 
+        total_damage: i32
+    ) -> Self
+}
+```
+
+======================================================================
+9. 用户系统 API
+======================================================================
+
+9.1 User 结构体
+描述: 用户数据结构
+
+```rust
+#[derive(Debug, Clone)]
+pub struct User {
+    pub username: String,     // 用户名
+    pub password: String,     // 密码
+    pub is_logged_in: bool,  // 登录状态
+}
+
+impl User {
+    /// 创建新用户
+    /// 返回: User实例
+    pub fn new() -> Self
+
+    /// 用户登录
+    /// 参数: username - 用户名, password - 密码
+    /// 返回: bool登录是否成功
+    pub fn login(&mut self, username: &str, password: &str) -> bool
+}
+```
+
+测试账号信息:
+```
+用户名: admin
+密码: 123456
+```
+
+======================================================================
+10. 主游戏系统 API
+======================================================================
+
+10.1 Game 结构体
+描述: 游戏主控制器
+
+```rust
+pub struct Game {
+    // 核心状态
+    pub state: GameState,
+    pub player: Player,
+    pub enemies: Vec<Enemy>,
+    pub bullets: Vec<Bullet>,
+    pub items: Vec<Item>,
+    
+    // 时间相关
+    pub start_time: Instant,
+    pub last_spawn_time: Instant,
+    
+    // 游戏数据
+    pub coins: i32,
+    pub wins: i32,
+    pub available_upgrades: Vec<RogueUpgrade>,
+    pub screen_width: f32,
+    pub screen_height: f32,
+    pub rng: ThreadRng,
+    
+    // 用户系统
+    pub user: User,
+    pub input_text: String,
+    pub input_mode: InputMode,
+    
+    // 本局统计
+    pub current_session_coins: i32,
+    pub current_session_exp: i32,
+    pub enemies_defeated_this_session: i32,
+    pub total_damage_dealt: i32,
+    pub game_result: Option<GameResult>,
+    
+    // 肉鸽升级相关
+    pub rogue_selection_timer: f32,
+    pub current_rogue_options: Vec<RogueUpgrade>,
+    pub rogue_auto_selected: bool,
+    pub rogue_auto_selected_timer: f32,
+    
+    // 纹理资源
+    pub player_texture: Option<Texture2D>,
+    pub scout_texture: Option<Texture2D>,
+    pub heavy_texture: Option<Texture2D>,
+    pub carrier_texture: Option<Texture2D>,
+    pub boss_texture: Option<Texture2D>,
+    pub machinegun_bullet_texture: Option<Texture2D>,
+    pub laser_bullet_texture: Option<Texture2D>,
+    pub shotgun_bullet_texture: Option<Texture2D>,
+    pub heavy_bullet_texture: Option<Texture2D>,
+    pub boss_bullet_texture: Option<Texture2D>,
+    pub health_pack_texture: Option<Texture2D>,
+}
+
+impl Game {
+    /// 创建新游戏实例
+    /// 返回: Game实例
+    pub fn new() -> Self
+
+    /// 开始战斗
+    pub fn start_battle(&mut self)
+
+    /// 游戏主更新循环
+    /// 参数: dt - 帧时间差
+    pub fn update(&mut self, dt: f32)
+
+    /// 选择武器并开始游戏
+    /// 参数: weapon_type - 武器类型
+    pub fn select_weapon(&mut self, weapon_type: WeaponType)
+
+    /// 选择肉鸽升级
+    /// 参数: option_index - 选项索引(0-2)
+    pub fn select_rogue_upgrade(&mut self, option_index: usize)
+
+    /// 移动玩家
+    /// 参数: dx, dy - 移动偏移量
+    pub fn move_player(&mut self, dx: f32, dy: f32)
+
+    /// 获取游戏时间
+    /// 返回: f32游戏时间(秒)
+    pub fn get_game_time(&self) -> f32
+
+    /// 尝试登录
+    /// 参数: username - 用户名, password - 密码
+    /// 返回: bool登录是否成功
+    pub fn login_attempt(&mut self, username: &str, password: &str) -> bool
+
+    /// 添加字符到输入
+    /// 参数: ch - 字符
+    pub fn add_char_to_input(&mut self, ch: char)
+
+    /// 删除输入的最后一个字符
+    pub fn remove_char_from_input(&mut self)
+
+    /// 清空输入
+    pub fn clear_input(&mut self)
+
+    /// 获取游戏结算结果
+    /// 返回: Option<&GameResult>结算结果
+    pub fn get_game_result(&self) -> Option<&GameResult>
+}
+```
+
+======================================================================
+11. 配置和常量 API
+======================================================================
+
+11.1 窗口配置
+```rust
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Roguelike - 星际射击".to_owned(),
+        window_width: 800,
+        window_height: 600,
+        ..Default::default()
+    }
+}
+```
+
+11.2 游戏常量
+```rust
+// 屏幕尺寸
+const SCREEN_WIDTH: f32 = 800.0;
+const SCREEN_HEIGHT: f32 = 600.0;
+
+// 玩家初始属性
+const PLAYER_INITIAL_HEALTH: i32 = 20;
+const PLAYER_INITIAL_POSITION: Vec2 = Vec2::new(400.0, 550.0);
+
+// 游戏时间节点
+const HEAVY_SPAWN_TIME: f32 = 20.0;  // 重甲舰出现时间
+const CARRIER_SPAWN_TIME: f32 = 40.0; // 航母出现时间
+const BOSS_SPAWN_TIME: f32 = 180.0;   // Boss出现时间
+
+// 升级选择时间
+const ROGUE_SELECTION_TIME: f32 = 10.0; // 10秒自动选择
+
+// 道具掉落概率
+const HEALTH_PACK_DROP_RATE: f32 = 0.4; // 40%概率
+```
+
+======================================================================
+12. 错误处理 API
+======================================================================
+
+12.1 资源加载
+```rust
+/// 异步加载纹理资源
+/// 参数: path - 文件路径, name - 资源名称
+/// 返回: Option<Texture2D>加载结果
+async fn load_game_texture(path: &str, name: &str) -> Option<Texture2D>
+```
+
+12.2 边界检查
+```rust
+/// 安全的Vec索引访问
+/// 参数: vec - 向量引用, index - 索引
+/// 返回: Option<&T>元素引用
+fn safe_get<T>(vec: &Vec<T>, index: usize) -> Option<&T>
+
+/// 安全的Vec可变索引访问
+/// 参数: vec - 向量可变引用, index - 索引
+/// 返回: Option<&mut T>可变元素引用
+fn safe_get_mut<T>(vec: &mut Vec<T>, index: usize) -> Option<&mut T>
+```
+
+======================================================================
+13. 输入处理 API
+======================================================================
+
+13.1 主要控制键
+```rust
+// 移动控制
+KeyCode::W | KeyCode::Up    // 向上移动
+KeyCode::S | KeyCode::Down  // 向下移动
+KeyCode::A | KeyCode::Left  // 向左移动
+KeyCode::D | KeyCode::Right // 向右移动
+
+// 选择控制
+KeyCode::Key1  // 选择选项1/武器1
+KeyCode::Key2  // 选择选项2/武器2
+KeyCode::Key3  // 选择选项3/武器3
+
+// 系统控制
+KeyCode::Escape // 返回上级菜单
+KeyCode::R      // 重新开始游戏
+KeyCode::Enter  // 确认输入
+
+// 文本输入
+KeyCode::Backspace // 删除字符
+```
+
+13.2 输入处理函数
+```rust
+/// 处理主要游戏输入
+/// 参数: game - 游戏实例可变引用
+fn handle_input_macroquad(game: &mut Game)
+
+/// 处理登录界面输入
+/// 参数: game - 游戏实例可变引用
+fn handle_login_input(game: &mut Game)
+```
+
+======================================================================
+14. 渲染 API
+======================================================================
+
+14.1 主要渲染函数
+```rust
+/// 渲染游戏对象
+/// 参数: game - 游戏实例引用
+fn render_game(game: &Game)
+
+/// 渲染UI界面
+/// 参数: game - 游戏实例引用
+fn render_ui(game: &Game)
+
+/// 渲染肉鸽升级卡片
+/// 参数: game - 游戏实例引用, center_x, center_y - 屏幕中心坐标
+fn render_rogue_selection_cards(game: &Game, center_x: f32, center_y: f32)
+```
+
+14.2 辅助渲染函数
+```rust
+/// 文本自动换行
+/// 参数: text - 文本内容, max_chars_per_line - 每行最大字符数
+/// 返回: Vec<String>分行文本
+fn wrap_text(text: &str, max_chars_per_line: usize) -> Vec<String>
+```
+
+======================================================================
+15. 测试 API
+======================================================================
+
+15.1 单元测试
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_player_creation()
+    
+    #[test]
+    fn test_weapon_enhancement()
+    
+    #[test]
+    fn test_enemy_damage()
+    
+    #[test]
+    fn test_level_up()
+}
+```
