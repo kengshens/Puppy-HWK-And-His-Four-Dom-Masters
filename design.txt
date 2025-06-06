@@ -1,0 +1,398 @@
+======================================================================
+                     ROGUELIKE 星际射击游戏 - 设计文档
+======================================================================
+
+项目名称: Puppy HWK And His Four Dom Masters - 星际射击
+版本: 2.0
+开发语言: Rust
+图形库: macroquad
+文档类型: 技术设计文档
+
+======================================================================
+1. 系统架构设计
+======================================================================
+
+1.1 整体架构
+游戏采用基于组件的实体系统（Entity-Component System）设计思想，
+主要分为以下几个层次：
+
+表示层（Presentation Layer）
+├── 渲染系统（Rendering System）
+├── 输入处理系统（Input Handling）
+└── UI 界面系统（User Interface）
+
+逻辑层（Logic Layer）
+├── 游戏状态管理（Game State Management）
+├── 战斗系统（Combat System）
+├── 物理系统（Physics System）
+└── 升级系统（Upgrade System）
+
+数据层（Data Layer）
+├── 游戏对象（Game Objects）
+├── 配置数据（Configuration Data）
+└── 资源管理（Resource Management）
+
+1.2 核心设计模式
+- 状态机模式：GameState 枚举管理游戏状态
+- 组件模式：各种游戏对象通过结构体组合
+- 策略模式：不同武器类型的行为差异
+- 观察者模式：事件驱动的更新机制
+
+======================================================================
+2. 核心模块设计
+======================================================================
+
+2.1 游戏状态管理模块（Game State Module）
+
+GameState 枚举：
+- MainMenu：主菜单状态
+- WeaponSelect：武器选择状态
+- Login：用户登录状态
+- Battle：战斗状态
+- RogueSelection：肉鸽升级选择状态
+- GameOver：游戏结束状态
+
+状态转换逻辑：
+MainMenu → WeaponSelect → Battle ⇄ RogueSelection → GameOver
+     ↓         ↑                                    ↑
+   Login    ESC 键                               失败/胜利
+
+2.2 玩家系统模块（Player System Module）
+
+Player 结构体设计：
+- 基础属性：position, health, max_health, level
+- 战斗属性：weapon, attack_power_bonus, crit_rate, crit_damage
+- 升级属性：experience, experience_needed, rogue_upgrades
+- 防御属性：damage_reduction, invincibility_duration
+- 子弹属性：bullet_count_bonus, piercing, ricochet, burning_damage
+
+核心方法：
+- new()：创建新玩家
+- move_player()：移动控制
+- take_damage()：承受伤害（含无敌时间）
+- add_experience()：获得经验
+- level_up()：等级提升
+- can_shoot()：射击冷却检查
+
+2.3 武器系统模块（Weapon System Module）
+
+WeaponType 枚举：
+- MachineGun：机枪（高射速，双发）
+- Laser：激光（中等射速，穿透）
+- Shotgun：霰弹枪（中等射速，散射）
+
+Weapon 结构体：
+- weapon_type：武器类型
+- attack_power：基础攻击力
+- attack_speed：攻击速度
+- bullet_speed：子弹速度
+- bullet_count：子弹数量
+- enhancement_level：强化等级
+
+射击逻辑设计：
+- 机枪：左右交替发射，支持多发
+- 激光：直线射击，9999穿透值
+- 霰弹枪：扇形散射，角度可配置
+
+2.4 敌人系统模块（Enemy System Module）
+
+EnemyType 枚举及特性：
+- Scout：侦察机，简单直线移动
+- Heavy：重甲舰，复杂移动模式和攻击模式
+- Carrier：航母，定期生成侦察机
+- Boss：最终 Boss，两阶段战斗
+
+Enemy 结构体设计：
+- 基础属性：enemy_type, position, health, max_health
+- 移动属性：velocity, movement_pattern, target_position
+- 战斗属性：bullet_damage, collision_damage, special_state
+- 状态属性：is_invincible, has_reached_zone, spawn_time
+
+移动模式设计（Heavy）：
+1. 水平往返移动
+2. 圆形/椭圆轨道移动
+3. 之字形移动
+4. 追踪玩家移动
+
+2.5 子弹系统模块（Bullet System Module）
+
+BulletType 枚举：
+- 玩家子弹：PlayerMachineGun, PlayerLaser, PlayerShotgun
+- 敌人子弹：EnemyHeavy, EnemyBoss, EnemyGeneric
+
+Bullet 结构体：
+- 基础属性：position, velocity, damage, is_player_bullet
+- 特殊属性：piercing_count, ricochet_count, burning_damage
+- 视觉属性：explosion_damage, is_crit
+- 碰撞属性：hit_enemies（避免重复伤害）
+
+碰撞检测设计：
+- 圆形碰撞检测
+- 穿透机制：击中后减少穿透计数
+- 反弹机制：边界反弹并清空击中列表
+- 爆炸机制：范围伤害计算
+
+2.6 肉鸽升级系统模块（Rogue Upgrade Module）
+
+UpgradeRarity 枚举：
+- Common：普通（白色）
+- Rare：稀有（蓝色）
+- Epic：史诗（紫色）
+- Legendary：传说（金色）
+
+RogueUpgrade 结构体：
+- id：升级唯一标识
+- name：升级名称
+- short_desc：简短描述
+- detailed_desc：详细描述
+- rarity：稀有度
+- max_selections：最大选择次数（可选）
+
+升级效果映射：
+ID 0：生命强化（+3最大血量）
+ID 1：火力增加（+2攻击力）
+ID 2：精准射击（+10%暴击率）
+ID 3：致命一击（+20%暴击伤害）
+ID 4：多重射击（+1子弹数，最多5次）
+ID 5：爆炸弹头（+30%爆炸伤害）
+ID 6：燃烧弹药（+2燃烧伤害）
+ID 7：超频引擎（+30%攻击和移动速度）
+ID 8：振金装甲（+3伤害减免）
+ID 9：穿甲弹（+1穿透）
+ID 10：跳弹科技（+1反弹）
+
+======================================================================
+3. 数据结构设计
+======================================================================
+
+3.1 核心数据结构
+
+Vec2 结构体：
+```rust
+pub struct Vec2 {
+    pub x: f32,
+    pub y: f32,
+}
+```
+- 用途：位置、速度、方向向量
+- 方法：distance(), normalize()
+
+Game 主结构体：
+```rust
+pub struct Game {
+    // 核心状态
+    pub state: GameState,
+    pub player: Player,
+    pub enemies: Vec<Enemy>,
+    pub bullets: Vec<Bullet>,
+    pub items: Vec<Item>,
+    
+    // 时间管理
+    pub start_time: Instant,
+    pub last_spawn_time: Instant,
+    
+    // 资源管理
+    pub player_texture: Option<Texture2D>,
+    // ... 其他纹理
+    
+    // 用户系统
+    pub user: User,
+    pub input_text: String,
+    pub input_mode: InputMode,
+    
+    // 统计数据
+    pub current_session_coins: i32,
+    pub current_session_exp: i32,
+    pub enemies_defeated_this_session: i32,
+    pub total_damage_dealt: i32,
+}
+```
+
+3.2 集合数据结构选择
+
+Vec<T> 动态数组：
+- enemies：敌人列表，频繁增删
+- bullets：子弹列表，大量对象
+- items：道具列表，少量对象
+- rogue_upgrades：升级列表，静态数据
+
+Option<T> 可选类型：
+- 纹理资源：支持加载失败处理
+- 游戏结算：仅在游戏结束时存在
+- 最大选择次数：部分升级有限制
+
+3.3 内存管理策略
+
+对象池模式（预留）：
+- 子弹对象复用减少内存分配
+- 粒子效果对象池
+
+引用计数（Rc）：
+- 纹理资源共享
+- 升级配置数据共享
+
+======================================================================
+4. 渲染系统设计
+======================================================================
+
+4.1 渲染管线
+
+资源加载阶段：
+- 异步加载纹理资源
+- 错误处理和回退机制
+- 资源缓存管理
+
+渲染顺序：
+1. 清空背景（黑色）
+2. 渲染游戏对象（玩家、敌人、子弹、道具）
+3. 渲染 UI 界面
+4. 渲染特效（血条、爆炸效果）
+
+4.2 纹理系统
+
+纹理类型：
+- player_texture：玩家飞船
+- enemy_textures：各类敌人（scout, heavy, carrier, boss）
+- bullet_textures：各类子弹
+- item_textures：道具纹理
+
+回退机制：
+- 纹理加载失败时使用几何图形绘制
+- 保证游戏可玩性
+
+4.3 特效系统
+
+视觉效果：
+- 暴击子弹：金黄色高亮
+- 激光拖尾：半透明拖影效果
+- 无敌状态：闪烁效果
+- Boss 血条：专用大型血条
+
+动画效果：
+- 道具闪烁：正弦波透明度变化
+- Boss 浮动：正弦波位置偏移
+
+======================================================================
+5. 物理系统设计
+======================================================================
+
+5.1 碰撞检测系统
+
+检测类型：
+- 圆形 vs 圆形：distance < radius1 + radius2
+- 快速筛选：AABB 包围盒预检测
+
+碰撞响应：
+- 子弹 vs 敌人：伤害计算 + 特效触发
+- 敌人 vs 玩家：碰撞伤害 + 无敌时间
+- 子弹 vs 边界：反弹/销毁处理
+
+5.2 移动系统
+
+基础移动：
+- position += velocity * delta_time
+- 边界限制：clamp() 函数
+
+复杂移动模式：
+- 圆形轨道：三角函数计算
+- 追踪移动：向量归一化
+- 之字形移动：定时方向变换
+
+5.3 弹道系统
+
+直线弹道：
+- 固定方向向量
+- 恒定速度移动
+
+散射弹道：
+- 角度分布计算
+- 扇形发射模式
+
+预测弹道：
+- 预测玩家位置
+- 提前量计算
+
+======================================================================
+6. AI 系统设计
+======================================================================
+
+6.1 敌人 AI 架构
+
+行为状态机：
+- SPAWNING：生成状态
+- MOVING_TO_ZONE：移动到战斗区域
+- IN_COMBAT：战斗状态
+- SPECIAL_ATTACK：特殊攻击
+
+决策系统：
+- 基于时间的攻击模式切换
+- 随机性注入避免过于机械
+
+6.2 Boss AI 设计
+
+阶段管理：
+- 第一阶段：血量 > 50%，基础攻击模式
+- 第二阶段：血量 ≤ 50%，强化攻击模式
+
+攻击模式：
+- 圆形弹幕：360度全方位发射
+- 扇形弹幕：朝向玩家区域发射
+- 追踪弹幕：预测玩家位置
+
+6.3 生成系统
+
+敌人生成策略：
+- 时间驱动：每5秒生成一波侦察机
+- 位置随机：在屏幕上方随机位置生成
+- 难度递增：随时间增加敌人数量
+
+道具掉落系统：
+- 概率掉落：重甲舰40%概率掉落血包
+- 位置继承：在敌人死亡位置生成
+
+======================================================================
+7. 配置系统设计
+======================================================================
+
+7.1 游戏平衡配置
+- 武器参数：攻击力、射速、子弹数
+- 敌人参数：血量、移动速度、伤害
+- 升级效果：各种升级的数值
+- 经济参数：金币和经验奖励
+
+7.2 渲染配置
+- 屏幕分辨率：800x600
+- 帧率限制：60 FPS
+- 纹理设置：PNG 格式支持
+
+======================================================================
+8. 错误处理设计
+======================================================================
+
+8.1 资源加载错误
+- 纹理加载失败：回退到几何图形绘制
+- 配置文件缺失：使用默认值
+
+8.2 运行时错误
+- 数组越界：边界检查
+- 除零错误：安全除法函数
+- 内存不足：对象池和回收机制
+
+======================================================================
+9. 性能优化设计
+======================================================================
+
+9.1 渲染优化
+- 批量绘制：相同纹理的对象批量处理
+- 裁剪优化：屏幕外对象跳过渲染
+- 纹理压缩：减少内存占用
+
+9.2 逻辑优化
+- 空间分割：减少碰撞检测计算
+- 对象池：减少内存分配开销
+- 增量更新：仅更新变化的部分
+
+9.3 内存优化
+- 及时清理：移除屏幕外的子弹和敌人
+- 引用计数：共享不变的数据
+- 预分配：Vec 预留容量减少重分配
